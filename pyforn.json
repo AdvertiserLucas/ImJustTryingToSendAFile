@@ -1,5 +1,5 @@
 {
-  Verbs: {
+  "Verbs": {
     "Fear": "Drax",
     "Rise": "Rekta",
     "Awaken": "Rekta",
@@ -32,7 +32,7 @@
     "Get": "Daraek",
     "Know": "Saru"
   },
-  Adjectives: {
+  "Adjectives": {
     "Strong": "Varok",
     "Fast": "Zekan",
     "Dark": "Teneb",
@@ -58,7 +58,7 @@
     "Insane": "Xozorax",
     "Crazy": "Xozorax"
   },
-  Pronouns: {
+  "Pronouns": {
     "I": "Yo",
     "Me": "Yo",
     "My": "Yo",
@@ -84,7 +84,7 @@
     "These": "Tuvan",
     "Those": "Tovan"
   },
-  AuxiliaryVerbs: {
+  "Auxiliary Verbs": {
     "Is": "Sai",
     "Are": "Sai",
     "Am": "Sai",
@@ -101,7 +101,7 @@
     "Got": "Dordaraek",
     "To be": "Set"
   },
-  ConjunctionsAndPrepositions: {
+  "Conjunctions & Prepositions": {
     "And": "Pe",
     "Or": "Ro",
     "If": "Fi",
@@ -112,7 +112,7 @@
     "Out": "Xoic",
     "But": "Wi"
   },
-  CommonExpressions: {
+  "Common Expressions": {
     "Hello": "Piral",
     "Hi": "Ral",
     "Bye": "Vorat",
@@ -133,7 +133,7 @@
     "Hate": "Draxa",
     "Yay": "Shooooox!"
   },
-  TimeRelated: {
+  "Time Related": {
     "Early": "Pauren",
     "Morning": "Pauren",
     "Late": "Xopauren",
@@ -142,7 +142,7 @@
     "Later": "Xopaurenek",
     "Time": "Nex"
   },
-  AbstractNouns: {
+  "Abstract Nouns": {
     "More": "Ra",
     "Less": "Xora",
     "Loud": "Chax",
@@ -167,7 +167,7 @@
     "Blindness": "Xospecco",
     "Language": "Pypy"
   },
-  SchoolAndOfficeSupplies: {
+  "School & Office Supplies": {
     "Pen": "Penar",
     "Paper": "Papur",
     "Book": "Livre",
@@ -181,7 +181,7 @@
     "Clip": "Klip",
     "Card": "Krat"
   },
-  FoodAndDrink: {
+  "Food and Drink": {
     "Food": "Furnar",
     "Chicken tenders": "Furnarok",
     "Chicken nuggets": "Krispak",
@@ -197,7 +197,7 @@
     "Fries": "Feska",
     "Water": "Zara"
   },
-  TechnologyAndElectronics: {
+  "Technology and Electronics": {
     "Phone": "Telefon",
     "Computer": "Alopertaysok",
     "Electronic Device": "Alopertaysok",
@@ -213,7 +213,7 @@
     "Radio": "Rada",
     "Plane": "Regin"
   },
-  HouseholdItems: {
+  "Household Items": {
     "Light": "Lumi",
     "Lamp": "Lunaf",
     "Lantern": "Lanter",
@@ -227,18 +227,18 @@
     "Vase": "Vasek",
     "Bottle": "Bist"
   },
-  Clothing: {
+  "Clothing": {
     "Pants": "Pantalon",
     "Shorts": "Futuri",
     "Shoes": "Chos",
     "Scarf": "Skarf",
     "Hat": "Hatar"
   },
-  Nature: {
+  "Nature": {
     "Plant": "Cresviri",
     "Drug": "Daxx"
   },
-  Colors: {
+  "Colors": {
     "Red": "Ruvon",
     "Orange": "Orvix",
     "Yellow": "Zelkor",
@@ -252,7 +252,7 @@
     "Gold": "Golmar",
     "Silver": "Silven"
   },
-  Animals: {
+  "Animals": {
     "Animal": "Waifle",
     "Dog": "Vufar",
     "Cat": "Nykra",
@@ -278,7 +278,7 @@
     "Zombie": "Draevok",
     "Skeleton": "Nekor"
   },
-  Numbers: {
+  "Numbers": {
     "One": "Pyn",
     "Two": "Tek",
     "Three": "Rel",
@@ -306,7 +306,7 @@
     "Hundred million": "Cenparon",
     "Billion": "Miparon"
   },
-  Directions: {
+  "Directions": {
     "Right": "Pavun",
     "Left": "Xopavun",
     "Up": "Pexen",
@@ -318,7 +318,7 @@
     "East": "Espen",
     "West": "Vespen"
   },
-  Shapes2D: {
+  "Shapes 2D": {
     "Polygon": "Pan",
     "Regular polygon": "Tai",
     "Parallel sides": "Kik",
@@ -334,7 +334,7 @@
     "Parallelogram": "Fentpantekik",
     "Rectangle": "Fentpantekikot"
   },
-  Shapes3D: {
+  "Shapes 3D": {
     "Pyramid": "Faf",
     "Triangular pyramid": "Relfaf",
     "Square pyramid": "Fentfaf",
@@ -343,7 +343,7 @@
     "Sphere": "Zerontaix",
     "Cylinder": "Zerontaif"
   },
-  SevenPointScale: {
+  "SevenPointScale (SPS)": {
     "Yes 100%": "Va",
     "Mostly 83%": "Vulu",
     "Kinda 66%": "Voxo",
@@ -352,7 +352,7 @@
     "Mostly not 17%": "Xulu",
     "No 0%": "Xo"
   },
-  SevenPointScaleGoodBad: {
+  "SPS-GoodBad": {
     "Good 100%": "Fuva",
     "Mostly good 83%": "Fuvulu",
     "Kinda good 66%": "Fuvoxo",
@@ -361,7 +361,7 @@
     "Mostly bad 17%": "Fuxulu",
     "Bad 0%": "Fuxo"
   },
-  SevenPointScaleHighLow: {
+  "SPSHighLow": {
     "High 100%": "Tava",
     "Mostly high 83%": "Tavulu",
     "Kinda high 66%": "Tavoxo",
@@ -370,7 +370,7 @@
     "Mostly low 17%": "Taxulu",
     "Low 0%": "Taxo"
   },
-  SevenPointScaleTime: {
+  "SPSTime": {
     "Far future": "Uva",
     "Near future": "Uvulu",
     "Very soon": "Uvoxo",
@@ -379,7 +379,7 @@
     "Near past": "Uxulu",
     "Far past": "Uxo"
   },
-  QuestionWords: {
+  "SPSQuestionWords": {
     "Why": "Wiva",
     "Because": "Wivulu",
     "When": "Wivoxo",
@@ -388,7 +388,7 @@
     "Where": "Wixulu",
     "What": "Wixo"
   },
-  Prefixes: {
+  "Prefixes": {
     "Anti/Not/Opposite": "Xo-",
     "Great/Ultimate": "Ka-",
     "High/Superior": "Zor-",
@@ -396,14 +396,14 @@
     "Past tense": "Dar-/Dor-",
     "Future tense": "Trev-"
   },
-  Suffixes: {
+  "Suffixes": {
     "Action/Process": "-ek",
     "Adjective modifier": "-en",
     "Relating to": "-ar",
     "Plural": "-on"
   },
-  Miscellaneous: {
+  "Miscellaneous": {
     "Instrument": "Nelion",
     "The": "Ka"
   }
-};
+}
