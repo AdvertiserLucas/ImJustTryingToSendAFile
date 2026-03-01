@@ -9,6 +9,8 @@
     "Run": "Zex",
     "Walk": "Zexa",
     "Drive": "Zexi",
+    "Turn": "Vertus",
+    "Rotate": "Gyrul",
     "Fight": "Vorak",
     "See": "Teren",
     "Watch": "Teren",
@@ -39,6 +41,7 @@
     "Crispy": "Kris",
     "Small": "Pak",
     "Perfect": "Rok",
+    "Clean": "Puru",
     "Cold": "Fex",
     "Hot": "Vuren",
     "Fire-like": "Vuren",
@@ -111,6 +114,11 @@
     "If": "Fi",
     "With": "Pek",
     "Without": "Xopek",
+    "Below": "Helifra",
+    "Above": "Suproca",
+    "Perrol": "Through",
+    "Circulon": "Around",
+    "Dezolo": "About",
     "At": "Riv",
     "In": "Ic",
     "Out": "Xoic",
@@ -231,6 +239,11 @@
     "Basket": "Basar",
     "Vase": "Vasek",
     "Bottle": "Bist"
+  },
+  "OutsideItems": {
+    "Car": "Cufir",
+    "Bike": "Bironav",
+    "Road": "Vinelo"
   },
   "Clothing": {
     "Pants": "Pantalon",
