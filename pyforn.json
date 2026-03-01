@@ -243,7 +243,10 @@
   "OutsideItems": {
     "Car": "Cufir",
     "Bike": "Bironav",
-    "Road": "Vinelo"
+    "Road": "Vinelo",
+    "Man": "Vico",
+    "Woman": "Vila",
+    "Gender": "Gevon"
   },
   "Clothing": {
     "Pants": "Pantalon",
