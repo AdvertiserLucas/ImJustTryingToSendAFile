@@ -1,0 +1,24 @@
+{
+  "Prefixes": {
+    "non.un.il.in.dis.anti.an": "xo",
+    "super-.super": "ka",
+    "High/Superior": "Zor-",
+    "Ancient/Old": "Dra-"
+  },
+  "Suffixes": {
+    "Action/Process": "-ek",
+    "Adjective modifier": "-en",
+    "Relating to": "-ar",
+    "Plural": "-on"
+  },
+  "EnglishP-PyfornS": {
+    "Action/Process": "-ek",
+    "Adjective modifier": "-en",
+    "Relating to": "-ar",
+    "Plural": "-on"
+  },
+  "EnglishS-PyfornP": {
+    "ed": "dar",
+    "Future tense": "trev"
+  }
+}
