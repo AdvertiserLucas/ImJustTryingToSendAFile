@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PlutoSDR WebSDR — Stable Streaming RX/TX</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;padding:18px;background:#101318;color:#d8dee9;font:14px system-ui,sans-serif}
+h1{font-size:20px;margin:0 0 14px;color:#8fbcbb}
+h2{font-size:15px;margin:0 0 12px}
+.panel{background:#181d24;border:1px solid #2c333e;border-radius:10px;padding:14px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:950px){.grid{grid-template-columns:1fr}}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:10px}
+.field{display:flex;flex-direction:column;gap:4px}
+label{font-size:11px;color:#9aa5b1}
+input,select,button{background:#222832;color:#d8dee9;border:1px solid #39414d;border-radius:5px;padding:7px 9px;font:inherit}
+input[type=number]{width:155px}
+input[type=range]{width:150px;padding:0}
+button{cursor:pointer}
+button:hover{background:#2b323d}
+button.active{background:#467b62;border-color:#67a37f;color:#fff}
+button.txactive{background:#9a4f4f;border-color:#c56b62;color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{padding:5px 8px;border-radius:5px;background:#422b2b;color:#df9999;font-size:12px}
+.status.ok{background:#294536;color:#91d4a7}
+.mode button{min-width:55px}
+.small{font-size:11px;color:#7f8998}
+.stats{font:11px ui-monospace,monospace;color:#8995a4;white-space:pre-wrap;margin-top:8px}
+canvas{display:block;width:100%;background:#050608;border-radius:6px}
+#spectrum{height:235px}
+#scope{height:100px;margin-top:8px}
+.note{padding:8px;background:#151a20;border:1px solid #29303a;border-radius:6px;font-size:11px;color:#98a3b1}
+.warn{color:#e0b27d}
+</style>
+</head>
+<body>
+<h1>PlutoSDR WebSDR — stable 300 kS/s streaming</h1>
+
+<div class="panel">
+  <div class="row">
+    <div class="field"><label>Bridge</label><input id="wsAddr" value="ws://192.168.2.1:8080/" size="29"></div>
+    <button id="connectBtn">Connect</button>
+    <span id="conn" class="status">disconnected</span>
+  </div>
+  <div class="note">
+    This matches the supplied <b>plutobridge.c</b>: RX is signed 16-bit I/Q at
+    <b>300,000 complex samples/sec</b>, and TX is sent as paced
+    <b>4096-complex-sample</b> WebSocket binary frames. The browser never sends giant TX bursts.
+  </div>
+</div>
+
+<div class="grid">
+<section class="panel">
+<h2>RX — Receiver</h2>
+<div class="row">
+  <button id="rxToggle" class="active">RX ON</button>
+  <div class="field"><label>Frequency (Hz)</label><input id="rxFreq" type="number" value="98900000" step="1000"></div>
+  <div class="field"><label>RF bandwidth</label><select id="rxBW"></select></div>
+  <div class="field"><label>Custom BW (Hz)</label><input id="rxBWCustom" type="number" value="180000" step="1000"></div>
+</div>
+<div class="row">
+  <div class="field"><label>RX gain <span id="rxGainText">40 dB</span></label><input id="rxGain" type="range" min="0" max="70" value="40"></div>
+  <div class="field"><label>Demodulator</label><div class="mode" id="rxModes">
+    <button class="active" data-mode="WFM">WFM</button><button data-mode="NFM">NFM</button>
+    <button data-mode="AM">AM</button><button data-mode="USB">USB</button><button data-mode="LSB">LSB</button>
+  </div></div>
+  <button id="rxMute">Mute</button>
+  <div class="field"><label>Volume</label><input id="volume" type="range" min="0" max="1" step=".01" value=".8"></div>
+  <button id="flipSpectrum">Flip spectrum</button>
+</div>
+<div class="row">
+  <div class="field"><label>RX level</label><div style="width:160px;height:14px;background:#222832;border:1px solid #39414d;border-radius:4px;overflow:hidden"><div id="vuBar" style="height:100%;width:0%;background:linear-gradient(90deg,#467b62,#c9a24a,#c56b62);transition:width .05s linear"></div></div></div>
+  <div class="field"><label>Squelch <span id="squelchText">off</span></label><input id="squelch" type="range" min="-90" max="0" value="-90"></div>
+  <div class="field"><label>Signal <span id="signalText">— dB</span></label></div>
+  <div class="field"><label>Spectrum gain <span id="specGainText">30 dB</span></label><input id="specGain" type="range" min="0" max="80" value="30"></div>
+</div>
+<canvas id="spectrum" width="1200" height="235"></canvas>
+<canvas id="scope" width="1200" height="100"></canvas>
+<div id="rxStats" class="stats">RX starting…</div>
+</section>
+
+<section class="panel">
+<h2>TX — Transmitter</h2>
+<div class="row">
+  <button id="txToggle">TX OFF</button>
+  <div class="field"><label>Frequency (Hz)</label><input id="txFreq" type="number" value="433000000" step="1000"></div>
+  <div class="field"><label>RF bandwidth</label><select id="txBW"></select></div>
+  <div class="field"><label>Custom BW (Hz)</label><input id="txBWCustom" type="number" value="200000" step="1000"></div>
+  <div class="field"><label>TX attenuation <span id="txAttText">20 dB</span></label><input id="txAtt" type="range" min="0" max="89" value="20"></div>
+</div>
+<div class="row">
+  <div class="field"><label>Modulator</label><div class="mode" id="txModes">
+    <button class="active" data-mode="WFM">WFM</button><button data-mode="NFM">NFM</button>
+    <button data-mode="AM">AM</button><button data-mode="USB">USB</button><button data-mode="LSB">LSB</button>
+  </div></div>
+  <div class="field"><label>Audio LPF (Hz)</label><input id="txAudioBW" type="number" value="15000" step="100"></div>
+</div>
+
+<div class="row">
+  <div class="field"><label>Test tone (Hz, 20–20000)</label><input id="toneFreq" type="number" value="1000" min="20" max="20000" step="10"></div>
+  <button id="toneBtn">Send tone</button>
+</div>
+
+<div class="row">
+  <button id="fileBtn" class="active">File source</button>
+  <button id="micBtn">Microphone source</button>
+</div>
+
+<div class="row" id="fileControls">
+  <input id="file" type="file" accept="audio/*">
+  <button id="play" disabled>Play</button>
+  <button id="pause" disabled>Pause</button>
+  <button id="stop" disabled>Stop</button>
+</div>
+
+<div class="row" id="micControls" style="display:none">
+  <div class="field"><label>Microphone</label><select id="micSelect" style="min-width:280px"><option value="">Default microphone</option></select></div>
+  <button id="micStart">Start mic</button>
+  <button id="ptt" disabled>PTT</button>
+</div>
+<div id="micStatus" class="small"></div>
+<div id="txStats" class="stats">TX idle</div>
+</section>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   EXACT bridge-side web format
+   ============================================================ */
+const WEB_RATE=300000;
+const WEB_CHUNK=4096;
+const MAX_TX_IQ=WEB_CHUNK*48;
+let ws=null;
+
+const $=id=>document.getElementById(id);
+const state={
+  rxOn:true,txOn:false,rxMode:'WFM',txMode:'WFM',
+  muted:false,flip:false,
+  rxChunks:0,txFrames:0,txDropped:0,
+  squelchDb:-90,specGainDb:30,
+  lastStats:performance.now()
+};
+
+/* ---------- bandwidth presets ---------- */
+const BW={
+  WFM:[150000,180000,200000],
+  NFM:[8000,12500,25000],
+  AM:[5000,10000,20000],
+  USB:[2400,2700,3000],
+  LSB:[2400,2700,3000]
+};
+function makeBWSelect(sel,mode,custom){
+  sel.innerHTML='';
+  BW[mode].forEach(v=>{
+    const o=document.createElement('option');o.value=v;o.textContent=(v>=1000?v/1000+' kHz':v+' Hz');sel.appendChild(o)
+  });
+  sel.value=mode==='WFM'?(custom?180000:180000):BW[mode][1]??BW[mode][0];
+}
+function currentBW(which){
+  return +(which==='rx'?$('rxBWCustom').value:$('txBWCustom').value);
+}
+function selectBW(which){
+  const mode=which==='rx'?state.rxMode:state.txMode;
+  const sel=which==='rx'?$('rxBW'):$('txBW');
+  const custom=which==='rx'?$('rxBWCustom'):$('txBWCustom');
+  custom.value=+sel.value;
+  if(which==='rx')tuneRX();else tuneTX();
+}
+makeBWSelect($('rxBW'),'WFM',true);$('rxBW').value=180000;$('rxBWCustom').value=180000;
+makeBWSelect($('txBW'),'WFM',true);$('txBW').value=200000;$('txBWCustom').value=200000;
+
+/* ---------- WebSocket ---------- */
+function setConn(ok,text){$('conn').className='status '+(ok?'ok':'');$('conn').textContent=text}
+function sendJSON(o){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(o))}
+function tuneRX(){sendJSON({cmd:'tune',rxfreq:+$('rxFreq').value,rxgain:+$('rxGain').value,rxbw:Math.max(200000,currentBW('rx'))})}
+function tuneTX(){sendJSON({cmd:'tune',txfreq:+$('txFreq').value,txatten:+$('txAtt').value,txbw:Math.max(200000,currentBW('tx'))})}
+function tuneAll(){sendJSON({cmd:'tune',
+  rxfreq:+$('rxFreq').value,txfreq:+$('txFreq').value,
+  rxgain:+$('rxGain').value,txatten:+$('txAtt').value,
+  rxbw:Math.max(200000,currentBW('rx')),txbw:Math.max(200000,currentBW('tx'))
+})}
+
+function connect(){
+  if(ws&&ws.readyState===WebSocket.OPEN){ws.close();return}
+  ws=new WebSocket($('wsAddr').value);
+  ws.binaryType='arraybuffer';
+  ws.onopen=()=>{setConn(true,'connected');$('connectBtn').textContent='Disconnect';tuneAll();updateStats()};
+  ws.onerror=()=>setConn(false,'WebSocket error');
+  ws.onclose=()=>{setConn(false,'disconnected');$('connectBtn').textContent='Connect';stopTX();stopMic();stopRXAudio()};
+  ws.onmessage=e=>{
+    if(e.data instanceof ArrayBuffer){state.rxChunks++;processRX(e.data)}
+  };
+}
+$('connectBtn').onclick=connect;
+
+/* ---------- RX controls ---------- */
+$('rxToggle').onclick=()=>{
+  state.rxOn=!state.rxOn;
+  $('rxToggle').textContent=state.rxOn?'RX ON':'RX OFF';
+  $('rxToggle').classList.toggle('active',state.rxOn);
+  if(!state.rxOn)stopRXAudio();else resetRX();
+};
+$('rxFreq').onchange=tuneRX;
+$('rxBW').onchange=()=>selectBW('rx');
+$('rxBWCustom').onchange=tuneRX;
+$('rxGain').oninput=()=>{$('rxGainText').textContent=$('rxGain').value+' dB';tuneRX()};
+$('rxMute').onclick=()=>{state.muted=!state.muted;$('rxMute').textContent=state.muted?'Unmute':'Mute';if(state.muted)stopRXAudio()};
+$('volume').oninput=e=>master.gain.value=+e.target.value;
+$('flipSpectrum').onclick=()=>{state.flip=!state.flip;$('flipSpectrum').textContent=state.flip?'Spectrum normal':'Flip spectrum'};
+$('squelch').oninput=()=>{
+  state.squelchDb=+$('squelch').value;
+  $('squelchText').textContent=state.squelchDb<=-90?'off':state.squelchDb+' dB';
+};
+$('specGain').oninput=()=>{state.specGainDb=+$('specGain').value;$('specGainText').textContent=state.specGainDb+' dB'};
+
+document.querySelectorAll('#rxModes button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#rxModes button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+  state.rxMode=b.dataset.mode;
+  makeBWSelect($('rxBW'),state.rxMode);
+  $('rxBWCustom').value=BW[state.rxMode][1]??BW[state.rxMode][0];
+  tuneRX();resetRX();
+});
+
+/* ---------- TX controls ---------- */
+$('txToggle').onclick=()=>state.txOn?stopTX():startTX();
+$('txFreq').onchange=tuneTX;
+$('txBW').onchange=()=>selectBW('tx');
+$('txBWCustom').onchange=tuneTX;
+$('txAtt').oninput=()=>{$('txAttText').textContent=$('txAtt').value+' dB';tuneTX()};
+
+document.querySelectorAll('#txModes button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#txModes button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+  state.txMode=b.dataset.mode;
+  makeBWSelect($('txBW'),state.txMode);
+  $('txBWCustom').value=BW[state.txMode][1]??BW[state.txMode][0];
+  tuneTX();resetTX();
+});
+
+/* ============================================================
+   RX AUDIO
+   ============================================================ */
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+const master=audioCtx.createGain();master.gain.value=.8;master.connect(audioCtx.destination);
+let audioClock=0;
+let rxPending=[];
+const RX_AUDIO_TARGET=4096;
+
+function stopRXAudio(){rxPending=[];audioClock=audioCtx.currentTime+.03}
+function scheduleRX(x,rate){
+  if(!state.rxOn||state.muted)return;
+  for(let i=0;i<x.length;i++)rxPending.push(x[i]);
+  if(rxPending.length<RX_AUDIO_TARGET)return;
+  const take=rxPending.splice(0,RX_AUDIO_TARGET);
+  const b=audioCtx.createBuffer(1,take.length,rate);b.copyToChannel(Float32Array.from(take),0);
+  const src=audioCtx.createBufferSource();src.buffer=b;src.connect(master);
+  const now=audioCtx.currentTime;
+  if(audioClock<now+.02)audioClock=now+.05;
+  src.start(audioClock);
+  audioClock+=take.length/rate;
+  /* Never allow seconds of browser-side latency to accumulate. */
+  if(audioClock-now>.35){rxPending=[];audioClock=now+.08}
+}
+
+const rx={
+  li:1,lq:0,
+  deem:0,
+  dcx:0,dcy:0,
+  amx:0,amy:0,
+  hI:new Float32Array(62),
+  hQ:new Float32Array(62),
+  hSSB:new Float32Array(62),
+  lp:0,
+  lastSignalDb:-120
+};
+function resetRX(){
+  rx.li=1;rx.lq=0;rx.deem=0;rx.dcx=rx.dcy=0;rx.amx=rx.amy=0;rx.lp=0;
+  rx.hI.fill(0);rx.hQ.fill(0);rx.hSSB.fill(0);stopRXAudio()
+}
+
+/* ---------- DSP ---------- */
+function lpCoeffs(cut,rate,N=63){
+  if(!(N&1))N++;
+  cut=Math.max(10,Math.min(cut,rate*.48));
+  const h=new Float32Array(N),M=(N-1)/2,fc=cut/rate;let sum=0;
+  for(let n=0;n<N;n++){
+    const k=n-M;
+    const sinc=Math.abs(k)<1e-12?2*fc:Math.sin(2*Math.PI*fc*k)/(Math.PI*k);
+    const win=.54-.46*Math.cos(2*Math.PI*n/(N-1));
+    h[n]=sinc*win;sum+=h[n]
+  }
+  for(let n=0;n<N;n++)h[n]/=sum;
+  return h
+}
+function fir(x,h,history){
+  const L=h.length-1,ext=new Float32Array(L+x.length);
+  ext.set(history);ext.set(x,L);
+  const out=new Float32Array(x.length);
+  for(let i=0;i<x.length;i++){let s=0;for(let k=0;k<h.length;k++)s+=ext[i+L-k]*h[k];out[i]=s}
+  history.set(ext.subarray(ext.length-L));return out
+}
+function firC(I,Q,h){
+  return [fir(I,h,rx.hI),fir(Q,h,rx.hQ)]
+}
+function dec(x,f){
+  const n=Math.floor(x.length/f),o=new Float32Array(n);
+  for(let i=0;i<n;i++){let s=0;for(let k=0;k<f;k++)s+=x[i*f+k];o[i]=s/f}return o
+}
+function disc(I,Q){
+  const o=new Float32Array(I.length);let li=rx.li,lq=rx.lq;
+  for(let i=0;i<I.length;i++){
+    // phase difference = angle( y[n] * conj(y[n-1]) ) = atan2(Q[n]*I[n-1]-I[n]*Q[n-1], I[n]*I[n-1]+Q[n]*Q[n-1])
+    const im=Q[i]*li-I[i]*lq,re=I[i]*li+Q[i]*lq;
+    o[i]=Math.atan2(im,re);li=I[i];lq=Q[i]
+  }
+  rx.li=li;rx.lq=lq;return o
+}
+function deemph(x,rate,tau){
+  const a=1-Math.exp(-1/(rate*tau)),o=new Float32Array(x.length);let y=rx.deem;
+  for(let i=0;i<x.length;i++){y+=a*(x[i]-y);o[i]=y}rx.deem=y;return o
+}
+function dcBlock(x){
+  const o=new Float32Array(x.length),r=.995;let xm=rx.dcx,ym=rx.dcy;
+  for(let i=0;i<x.length;i++){const y=x[i]-xm+r*ym;o[i]=y;xm=x[i];ym=y}
+  rx.dcx=xm;rx.dcy=ym;return o
+}
+function envDC(x){
+  const o=new Float32Array(x.length),r=.999;let xm=rx.amx,ym=rx.amy;
+  for(let i=0;i<x.length;i++){const y=x[i]-xm+r*ym;o[i]=y;xm=x[i];ym=y}
+  rx.amx=xm;rx.amy=ym;return o
+}
+function onePole(x,rate,cut){
+  const a=(2*Math.PI*cut)/(rate+2*Math.PI*cut),o=new Float32Array(x.length);let y=rx.lp;
+  for(let i=0;i<x.length;i++){y+=a*(x[i]-y);o[i]=y}rx.lp=y;return o
+}
+function hilbert(x){
+  /* 63-tap Hilbert, state is continuous across WebSocket frames. */
+  const N=63,M=31,h=new Float32Array(N);
+  for(let n=0;n<N;n++){const k=n-M;if(k!==0&&Math.abs(k)%2===1)h[n]=2/(Math.PI*k)*(.54-.46*Math.cos(2*Math.PI*n/(N-1)))}
+  return fir(x,h,rx.hSSB)
+}
+function gainAudio(x){
+  let p=0;for(let i=0;i<x.length;i++)p=Math.max(p,Math.abs(x[i]));
+  const g=p>0?Math.min(5,.75/p):1,o=new Float32Array(x.length);
+  for(let i=0;i<x.length;i++)o[i]=Math.max(-1,Math.min(1,x[i]*g));
+  return o
+}
+function updateVU(x){
+  let sum=0;for(let i=0;i<x.length;i++)sum+=x[i]*x[i];
+  const rms=Math.sqrt(sum/Math.max(1,x.length));
+  const db=20*Math.log10(rms+1e-7);
+  const pct=Math.max(0,Math.min(100,(db+50)/50*100));
+  $('vuBar').style.width=pct+'%';
+}
+/* Squelch is judged on raw RF signal strength (mean |I,Q| of the incoming
+   chunk), not the AGC'd/normalized audio -- gainAudio() would otherwise
+   normalize weak noise right up to full scale and defeat the squelch. */
+function signalLevelDb(I,Q){
+  let s=0;for(let i=0;i<I.length;i++)s+=Math.hypot(I[i],Q[i]);
+  return 20*Math.log10(s/I.length+1e-9);
+}
+function outputRX(d,rate){
+  updateVU(d);
+  if(state.squelchDb>-90 && rx.lastSignalDb<state.squelchDb)return; /* squelched: drop this chunk */
+  scheduleRX(gainAudio(d),rate);
+}
+
+/* ---------- RX processing ---------- */
+function processRX(buf){
+  const a=new Int16Array(buf),n=a.length/2;
+  const I=new Float32Array(n),Q=new Float32Array(n);
+  for(let i=0;i<n;i++){I[i]=a[i*2]/32768;Q[i]=a[i*2+1]/32768}
+  drawSpectrum(I,Q);
+  if(!state.rxOn)return;
+
+  rx.lastSignalDb=signalLevelDb(I,Q);
+  $('signalText').textContent=rx.lastSignalDb.toFixed(1)+' dB';
+
+  if(state.rxMode==='WFM'){
+    /* 300k -> 150k. 180k RF BW -> ~100k complex LPF. */
+    const h=lpCoeffs(Math.min(100000,currentBW('rx')*.55),WEB_RATE);
+    const [fi,fq]=firC(I,Q,h);
+    const di=dec(fi,2),dq=dec(fq,2),rate=150000;
+    let d=disc(di,dq);
+    for(let i=0;i<d.length;i++)d[i]*=rate/(2*Math.PI*75000);
+    d=deemph(d,rate,75e-6);
+    d=onePole(d,rate,15000);
+    d=dec(d,3); /* 50 kHz */
+    d=dcBlock(d);
+    outputRX(d,50000);
+  }
+  else if(state.rxMode==='NFM'){
+    const h=lpCoeffs(Math.min(12000,currentBW('rx')*.45),WEB_RATE);
+    const [fi,fq]=firC(I,Q,h);
+    const di=dec(fi,10),dq=dec(fq,10),rate=30000;
+    let d=disc(di,dq);
+    for(let i=0;i<d.length;i++)d[i]*=rate/(2*Math.PI*5000);
+    d=onePole(d,rate,Math.min(5000,currentBW('rx')*.4));
+    d=dec(d,2);
+    d=dcBlock(d);
+    outputRX(d,15000);
+  }
+  else if(state.rxMode==='AM'){
+    const h=lpCoeffs(Math.min(12000,currentBW('rx')*.45),WEB_RATE);
+    const [fi,fq]=firC(I,Q,h);
+    const e=new Float32Array(fi.length);
+    for(let i=0;i<e.length;i++)e[i]=Math.hypot(fi[i],fq[i]);
+    let d=envDC(e);
+    d=dec(d,10);
+    d=onePole(d,30000,Math.min(10000,currentBW('rx')*.45));
+    outputRX(d,30000);
+  }
+  else{
+    const h=lpCoeffs(Math.min(3500,currentBW('rx')*.45),WEB_RATE);
+    const [fi,fq]=firC(I,Q,h);
+    const di=dec(fi,25),dq=dec(fq,25);
+    /* Match the known-good bridge/websdr convention: I plus/minus
+       the Hilbert transform of Q, after reducing the IQ stream to
+       the actual SSB audio-rate region. */
+    const hq=hilbert(dq);
+    const out=new Float32Array(di.length),sgn=state.rxMode==='USB'?1:-1;
+    for(let i=0;i<out.length;i++)out[i]=di[i]+sgn*hq[i];
+    outputRX(dcBlock(out),12000);
+  }
+}
+
+/* ---------- spectrum ---------- */
+function fft(re,im){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}
+  for(let len=2;len<=n;len<<=1){const a=-2*Math.PI/len,c=Math.cos(a),s=Math.sin(a);
+    for(let i=0;i<n;i+=len){let wr=1,wi=0;for(let k=0;k<len/2;k++){
+      const ur=re[i+k],ui=im[i+k],j=i+k+len/2,vr=re[j]*wr-im[j]*wi,vi=re[j]*wi+im[j]*wr;
+      re[i+k]=ur+vr;im[i+k]=ui+vi;re[j]=ur-vr;im[j]=ui-vi;
+      const nw=wr*c-wi*s;wi=wr*s+wi*c;wr=nw
+    }}
+  }
+}
+const spec=$('spectrum'),sctx=spec.getContext('2d'),SN=2048;
+function drawSpectrum(I,Q){
+  if(I.length<SN)return;
+  const re=new Float32Array(SN),im=new Float32Array(SN);
+  for(let i=0;i<SN;i++){const w=.5-.5*Math.cos(2*Math.PI*i/(SN-1));re[i]=I[i]*w;im[i]=Q[i]*w}
+  fft(re,im);sctx.fillStyle='#050608';sctx.fillRect(0,0,spec.width,spec.height);
+  sctx.strokeStyle='#8fbcbb';sctx.beginPath();
+  for(let i=0;i<SN;i++){
+    let k=(i+SN/2)%SN;if(state.flip)k=(SN-k)%SN;
+    const db=20*Math.log10(Math.hypot(re[k],im[k])+1e-9)+state.specGainDb;
+    const y=spec.height-Math.max(0,Math.min(spec.height,(db+80)*2.6)),x=i/SN*spec.width;
+    i?sctx.lineTo(x,y):sctx.moveTo(x,y)
+  }
+  sctx.stroke();sctx.strokeStyle='#4b5360';sctx.beginPath();sctx.moveTo(spec.width/2,0);sctx.lineTo(spec.width/2,spec.height);sctx.stroke()
+}
+const scope=$('scope'),pctx=scope.getContext('2d');
+function drawScope(x){
+  pctx.fillStyle='#050608';pctx.fillRect(0,0,scope.width,scope.height);
+  pctx.strokeStyle='#7aa2c7';pctx.beginPath();
+  for(let p=0;p<scope.width;p++){const v=x[Math.min(x.length-1,Math.floor(p*x.length/scope.width))]||0,y=scope.height/2-v*scope.height*.42;p?pctx.lineTo(p,y):pctx.moveTo(p,y)}
+  pctx.stroke()
+}
+
+/* ============================================================
+   TX
+   ============================================================ */
+const tx={
+  queue:new Float32Array(0),
+  phase:0,prev:0,prevValid:false,resamplePos:0,
+  h:new Float32Array(62),
+  fileTimer:null,file:null,filePos:0,playing:false,
+  fileAnchorTime:0,fileAnchorPos:0,
+  mic:false
+};
+function resetTX(){tx.phase=0;tx.prev=0;tx.prevValid=false;tx.resamplePos=0;tx.queue=new Float32Array(0)}
+function startTX(){
+  state.txOn=true;sendJSON({cmd:'tx_start'});$('txToggle').textContent='TX ON';$('txToggle').classList.add('txactive')
+}
+function stopTX(){
+  state.txOn=false;sendJSON({cmd:'tx_stop'});$('txToggle').textContent='TX OFF';$('txToggle').classList.remove('txactive');
+  tx.queue=new Float32Array(0);clearTimeout(tx.fileTimer)
+}
+function appendIQ(x){
+  /* x is INTERLEAVED I,Q. Keep a bounded browser queue. */
+  if(x.length>MAX_TX_IQ){x=x.subarray(x.length-MAX_TX_IQ)}
+  const room=MAX_TX_IQ-tx.queue.length;
+  if(x.length>room){
+    const drop=x.length-room;tx.queue=tx.queue.subarray(drop);state.txDropped+=Math.ceil(drop/2)
+  }
+  const y=new Float32Array(tx.queue.length+x.length);y.set(tx.queue);y.set(x,tx.queue.length);tx.queue=y
+}
+function txSendPump(){
+  if(!state.txOn||!ws||ws.readyState!==WebSocket.OPEN)return;
+  /* The C bridge's TX ring is WEB_CHUNK*64 and pre-rolls WEB_CHUNK*6.
+     Keep only a modest amount in the TCP/WebSocket side. */
+  if(ws.bufferedAmount>32768){setTimeout(txSendPump,5);return}
+  const need=WEB_CHUNK*2;
+  if(tx.queue.length>=need){
+    const q=tx.queue.subarray(0,need);tx.queue=tx.queue.slice(need);
+    const out=new Int16Array(need);
+    for(let i=0;i<need;i++)out[i]=Math.max(-32767,Math.min(32767,q[i]*0.48*32767));
+    ws.send(out.buffer);
+  }
+  setTimeout(txSendPump,3);
+}
+
+/* Streaming linear resampler. Output is always 300 kHz. */
+function resampleTo300k(x,inRate){
+  const ratio=inRate/WEB_RATE;
+  let src=x;
+  if(tx.prevValid){
+    const z=new Float32Array(x.length+1);z[0]=tx.prev;z.set(x,1);src=z
+  }
+  const out=[];
+  let p=tx.resamplePos;
+  while(p+1<src.length){
+    const i=Math.floor(p),f=p-i;
+    out.push(src[i]+(src[i+1]-src[i])*f);p+=ratio
+  }
+  tx.prev=src[src.length-1]||tx.prev;tx.prevValid=true;
+  tx.resamplePos=p-(src.length-1);
+  return Float32Array.from(out)
+}
+function audioLPF(x,rate,cut){
+  const alpha=(2*Math.PI*cut)/(rate+2*Math.PI*cut),o=new Float32Array(x.length);let y=tx.lp||0;
+  for(let i=0;i<x.length;i++){y+=alpha*(x[i]-y);o[i]=y}tx.lp=y;return o
+}
+function txHilbert(x){
+  const N=63,M=31,h=new Float32Array(N);
+  for(let n=0;n<N;n++){const k=n-M;if(k!==0&&Math.abs(k)%2===1)h[n]=2/(Math.PI*k)*(.54-.46*Math.cos(2*Math.PI*n/(N-1)))}
+  return firTX(x,h)
+}
+function firTX(x,h){
+  const L=h.length-1,ext=new Float32Array(L+x.length);ext.set(tx.h);ext.set(x,L);
+  const o=new Float32Array(x.length);
+  for(let i=0;i<x.length;i++){let s=0;for(let k=0;k<h.length;k++)s+=ext[i+L-k]*h[k];o[i]=s}
+  tx.h.set(ext.subarray(ext.length-L));return o
+}
+function txModulate(audio,inRate){
+  if(!state.txOn)return;
+  let a=resampleTo300k(audio,inRate);
+  const bw=Math.max(100,+$('txAudioBW').value);
+  a=audioLPF(a,WEB_RATE,Math.min(bw,WEB_RATE*.4));
+  const n=a.length,o=new Float32Array(n*2);
+  if(state.txMode==='WFM'||state.txMode==='NFM'){
+    let dev;
+    if(state.txMode==='WFM')dev=currentBW('tx')<=150000?50000:75000;
+    else dev=currentBW('tx')<=8000?2500:currentBW('tx')<=12500?5000:7500;
+    const dphi=2*Math.PI*dev/WEB_RATE;let p=tx.phase;
+    for(let i=0;i<n;i++){p+=Math.max(-1,Math.min(1,a[i]))*dphi;o[i*2]=Math.cos(p);o[i*2+1]=Math.sin(p)}
+    tx.phase=p%(2*Math.PI)
+  }else if(state.txMode==='AM'){
+    const depth=.85;
+    for(let i=0;i<n;i++){const s=Math.max(-1,Math.min(1,a[i]));o[i*2]=1+depth*s;o[i*2+1]=0}
+  }else{
+    const h=txHilbert(a),sgn=state.txMode==='USB'?1:-1;
+    for(let i=0;i<n;i++){o[i*2]=a[i];o[i*2+1]=sgn*h[i]}
+  }
+  appendIQ(o);txSendPump()
+}
+
+/* ---------- File source ---------- */
+$('file').onchange=async()=>{
+  const f=$('file').files[0];if(!f)return;
+  try{tx.file=await audioCtx.decodeAudioData(await f.arrayBuffer());tx.filePos=0;
+    $('play').disabled=false;$('pause').disabled=true;$('stop').disabled=false
+  }catch(e){alert('Audio decode failed: '+e.message)}
+};
+function filePump(){
+  if(!tx.playing||!tx.file||!state.txOn)return;
+  const rate=tx.file.sampleRate;
+  /* Compute how many frames SHOULD have been sent by now based on absolute
+     elapsed wall-clock time, rather than chaining relative setTimeout delays.
+     A plain relative scheduler accumulates timer jitter/drift over a long
+     playback (each late tick pushes the next one later still) -- this is
+     what caused popping that got temporarily better after restarting.
+     Recomputing against an absolute anchor every tick makes the drift
+     self-correct instead of compound. */
+  const now=performance.now();
+  const targetPos=tx.fileAnchorPos+(now-tx.fileAnchorTime)/1000*rate;
+  let frames=Math.floor(targetPos)-tx.filePos;
+  frames=Math.min(frames,Math.floor(rate*0.25)); /* cap a single catch-up burst */
+  if(frames>0){
+    frames=Math.min(frames,tx.file.length-tx.filePos);
+    if(frames<=0){tx.playing=false;stopTX();return}
+    const a=tx.file.getChannelData(0).subarray(tx.filePos,tx.filePos+frames);
+    txModulate(new Float32Array(a),rate);
+    tx.filePos+=frames;
+    if(tx.filePos>=tx.file.length){tx.playing=false;stopTX();$('play').disabled=false;$('pause').disabled=true;return}
+  }
+  tx.fileTimer=setTimeout(filePump,20);
+}
+function resetTXResampler(){tx.prev=0;tx.prevValid=false;tx.resamplePos=0;tx.lp=0;tx.h.fill(0)}
+$('play').onclick=()=>{
+  if(!tx.file)return;
+  if(!state.txOn)startTX();
+  resetTXResampler();
+  tx.fileAnchorTime=performance.now();tx.fileAnchorPos=tx.filePos;
+  tx.playing=true;$('play').disabled=true;$('pause').disabled=false;
+  filePump();
+};
+$('pause').onclick=()=>{tx.playing=false;clearTimeout(tx.fileTimer);$('play').disabled=false;$('pause').disabled=true};
+$('stop').onclick=()=>{tx.playing=false;clearTimeout(tx.fileTimer);tx.filePos=0;tx.queue=new Float32Array(0);$('play').disabled=false;$('pause').disabled=true};
+
+/* ---------- Test tone ---------- */
+const tone={playing:false,phase:0,anchorTime:0,framesSent:0,rate:48000,timer:null};
+function toneTick(){
+  if(!tone.playing)return;
+  const now=performance.now();
+  const targetFrames=Math.floor((now-tone.anchorTime)/1000*tone.rate);
+  let need=targetFrames-tone.framesSent;
+  need=Math.min(need,Math.floor(tone.rate*0.25));
+  if(need>0){
+    const f=Math.max(20,Math.min(20000,+$('toneFreq').value));
+    const dphi=2*Math.PI*f/tone.rate;
+    const buf=new Float32Array(need);
+    for(let i=0;i<need;i++){buf[i]=Math.sin(tone.phase);tone.phase+=dphi}
+    tone.phase%=2*Math.PI;
+    txModulate(buf,tone.rate);
+    tone.framesSent=targetFrames;
+  }
+  tone.timer=setTimeout(toneTick,20);
+}
+$('toneBtn').onclick=()=>{
+  if(tone.playing){
+    tone.playing=false;clearTimeout(tone.timer);
+    $('toneBtn').textContent='Send tone';$('toneBtn').classList.remove('txactive');
+    return;
+  }
+  if(!state.txOn)startTX();
+  resetTXResampler();
+  tone.playing=true;tone.anchorTime=performance.now();tone.framesSent=0;tone.phase=0;
+  $('toneBtn').textContent='Stop tone';$('toneBtn').classList.add('txactive');
+  toneTick();
+};
+
+/* ---------- Mic ---------- */
+let micStream=null,micSource=null,micNode=null,micSilentGain=null;
+async function listMics(){
+  const sel=$('micSelect');
+  if(!navigator.mediaDevices?.enumerateDevices){
+    $('micStatus').textContent='Microphone API unavailable here. Use HTTPS, localhost, or a browser security setting that permits this page.';
+    return
+  }
+  try{
+    const ds=await navigator.mediaDevices.enumerateDevices();
+    const old=sel.value;sel.innerHTML='<option value="">Default microphone</option>';
+    ds.filter(d=>d.kind==='audioinput').forEach((d,i)=>{
+      const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||('Microphone '+(i+1));sel.appendChild(o)
+    });
+    if([...sel.options].some(o=>o.value===old))sel.value=old;
+    $('micStatus').textContent=ds.some(d=>d.kind==='audioinput')?'Microphone devices found.':'No audio input devices reported by the browser.';
+  }catch(e){$('micStatus').textContent='Could not enumerate microphones: '+e.message}
+}
+$('micSelect').onchange=()=>{ if(micStream){stopMic();startMic();} };
+async function startMic(){
+  if(micStream)return;
+  if(!navigator.mediaDevices?.getUserMedia){
+    alert('The microphone API is unavailable on this page. Browsers only allow microphone access on HTTPS or on http://localhost -- opening this file directly (file://) or over plain http://<pluto-ip> will not work. See the note below the TX panel for how to fix this.');
+    return;
+  }
+  try{
+    const id=$('micSelect').value;
+    micStream=await navigator.mediaDevices.getUserMedia({audio:id?{deviceId:{exact:id},echoCancellation:false,noiseSuppression:false,autoGainControl:false}:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    await listMics(); /* device labels are only populated after permission is granted */
+    if(audioCtx.state==='suspended')await audioCtx.resume();
+    micSource=audioCtx.createMediaStreamSource(micStream);
+    micNode=audioCtx.createScriptProcessor(1024,1,1);
+    micNode.onaudioprocess=e=>{if(state.txOn)txModulate(new Float32Array(e.inputBuffer.getChannelData(0)),audioCtx.sampleRate)};
+    micSource.connect(micNode);
+    /* ScriptProcessorNode often won't fire onaudioprocess at all (esp. in Chrome)
+       unless it's connected downstream to the destination -- the audio graph has
+       to be "pulled". Route through a silent gain node so it fires but produces
+       no audible feedback. */
+    micSilentGain=audioCtx.createGain();
+    micSilentGain.gain.value=0;
+    micNode.connect(micSilentGain);
+    micSilentGain.connect(audioCtx.destination);
+    if(!state.txOn)startTX(); /* mic needs TX armed to actually transmit, same as Play does for files */
+    $('micStart').textContent='Stop mic';$('ptt').disabled=false;$('micStatus').textContent='Microphone live'+(state.txOn?' — transmitting.':' — arm TX to transmit.');
+  }catch(e){alert('Could not start microphone: '+e.message)}
+}
+function stopMic(){
+  if(micNode)micNode.disconnect();if(micSource)micSource.disconnect();if(micSilentGain)micSilentGain.disconnect();
+  if(micStream)micStream.getTracks().forEach(t=>t.stop());
+  micNode=null;micSource=null;micStream=null;micSilentGain=null;
+  $('micStart').textContent='Start mic';$('ptt').disabled=true;$('micStatus').textContent='';
+}
+$('micStart').onclick=()=>micStream?stopMic():startMic();
+$('fileBtn').onclick=()=>{
+  $('fileBtn').classList.add('active');$('micBtn').classList.remove('active');
+  $('fileControls').style.display='flex';$('micControls').style.display='none';
+  if(micStream)stopMic();
+};
+$('micBtn').onclick=()=>{
+  $('micBtn').classList.add('active');$('fileBtn').classList.remove('active');
+  $('micControls').style.display='flex';$('fileControls').style.display='none';
+  if(tx.playing){tx.playing=false;clearTimeout(tx.fileTimer);$('play').disabled=false;$('pause').disabled=true;}
+  listMics();
+};
+/* PTT */
+let ptt=false;
+function pttDown(){if(!ptt){ptt=true;startTX();$('ptt').textContent='TRANSMITTING'}}
+function pttUp(){if(ptt){ptt=false;stopTX();$('ptt').textContent='PTT'}}
+$('ptt').onmousedown=pttDown;$('ptt').onmouseup=pttUp;$('ptt').onmouseleave=pttUp;
+addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='SELECT'){e.preventDefault();pttDown()}});
+addEventListener('keyup',e=>{if(e.code==='Space'){e.preventDefault();pttUp()}});
+
+/* ---------- stats ---------- */
+function updateStats(){
+  const now=performance.now();
+  if(now-state.lastStats>500){
+    const rxRate=state.rxChunks*2,txRate=state.txFrames*2;
+    $('rxStats').textContent=state.rxOn?
+      `RX ${state.rxMode} | ${rxRate} IQ frames/s | audio queue ${(Math.max(0,audioClock-audioCtx.currentTime)*1000).toFixed(0)} ms | BW ${currentBW('rx')} Hz`:
+      'RX OFF — spectrum still available';
+    $('txStats').textContent=state.txOn?
+      `TX ${state.txMode} | browser queue ${(tx.queue.length/2).toFixed(0)} IQ | WS ${(ws?.bufferedAmount||0)} bytes | BW ${currentBW('tx')} Hz | dropped ${state.txDropped}`:
+      'TX OFF';
+    state.rxChunks=state.txFrames=0;state.lastStats=now
+  }
+  requestAnimationFrame(updateStats)
+}
+updateStats();
+listMics();
+/* Initial state: RX DSP is ready, TX is disarmed. */
+</script>
+</body>
+</html>
